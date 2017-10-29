@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-engine-xml>
+    <SecurityPermission description="View operations in the BackAdmin Component." permissionId="BACKADMIN_VIEW"/>
+    <SecurityPermission description="Create operations in the BackAdmin Component." permissionId="BACKADMIN_CREATE"/>
+    <SecurityPermission description="Update operations in the BackAdmin Component." permissionId="BACKADMIN_UPDATE"/>
+    <SecurityPermission description="Delete operations in the BackAdmin Component." permissionId="BACKADMIN_DELETE"/>
+    <SecurityPermission description="ALL operations in the BackAdmin Component." permissionId="BACKADMIN_ADMIN"/>
+    <SecurityGroupPermission groupId="FULLADMIN" permissionId="BACKADMIN_ADMIN"/>
+    <SecurityGroupPermission groupId="FLEXADMIN" permissionId="BACKADMIN_CREATE"/>
+    <SecurityGroupPermission groupId="FLEXADMIN" permissionId="BACKADMIN_DELETE"/>
+    <SecurityGroupPermission groupId="FLEXADMIN" permissionId="BACKADMIN_UPDATE"/>
+    <SecurityGroupPermission groupId="FLEXADMIN" permissionId="BACKADMIN_VIEW"/>
+    <SecurityGroupPermission groupId="VIEWADMIN" permissionId="BACKADMIN_VIEW"/>
+    <SecurityGroupPermission groupId="BIZADMIN" permissionId="BACKADMIN_ADMIN"/>
+</entity-engine-xml>
