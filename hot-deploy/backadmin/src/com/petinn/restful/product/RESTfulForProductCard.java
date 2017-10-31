@@ -33,6 +33,7 @@ import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.util.*;
+import com.petinn.util.JavaWebToken;
 
 /**
  * RESTfulForProductCard
@@ -98,7 +99,30 @@ public class RESTfulForProductCard extends RESTfulForBase {
     @Path("test")
     @Produces(MediaType.APPLICATION_JSON)
     public String findSelfCard(@Context HttpServletRequest request) {
-        return failure("服务错误");
+        Map<String,Object> m = new HashMap<String,Object>();
+        m.put("userid", "234241432412412421341");
+        String token = JavaWebToken.createJavaWebToken(m);
+        System.out.println(token);
+        return failure(token);
+    }
+
+
+    @POST
+    @Path("parser")
+    @Produces(MediaType.APPLICATION_JSON)
+    public String parser(@FormParam(value = "token") String token,
+                         @Context HttpServletRequest request) {
+
+        String token1 = request.getParameter("token1");
+        System.out.println(token);
+        if(JavaWebToken.parserJavaWebToken(token) != null){
+            return failure(token);
+            //表示token合法
+        }else{
+            //token不合法或者过期
+            return success(token);
+        }
+
     }
 
 }
