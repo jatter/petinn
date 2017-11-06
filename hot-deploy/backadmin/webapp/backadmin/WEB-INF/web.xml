@@ -70,8 +70,14 @@
         </init-param>
         <load-on-startup>1</load-on-startup>
     </servlet>
+    <servlet>
+        <servlet-name>InitialServlet</servlet-name>
+        <servlet-class>com.petinn.component.servlet.InitialServlet</servlet-class>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
     <servlet-mapping><servlet-name>ControlServlet</servlet-name><url-pattern>/control/*</url-pattern></servlet-mapping>
     <servlet-mapping><servlet-name>RestfulService</servlet-name><url-pattern>/rest/*</url-pattern></servlet-mapping>
+    <servlet-mapping><servlet-name>InitialServlet</servlet-name><url-pattern>/initial/*</url-pattern></servlet-mapping>
 
     <session-config><session-timeout>60</session-timeout><!-- in minutes --></session-config>
 

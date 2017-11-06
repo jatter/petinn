@@ -286,11 +286,6 @@ under the License.
 
     <!-- Product Store Role Services -->
     <simple-method method-name="createProductStoreRole" short-description="Create ProductStoreRole">
-        <check-permission permission="CATALOG" action="_CREATE">
-            <fail-property resource="ProductUiLabels" property="ProductCatalogCreatePermissionError"/>
-        </check-permission>
-        <check-errors/>
-
         <make-value value-field="newEntity" entity-name="ProductStoreRole"/>
         <set-pk-fields map="parameters" value-field="newEntity"/>
         <set-nonpk-fields map="parameters" value-field="newEntity"/>

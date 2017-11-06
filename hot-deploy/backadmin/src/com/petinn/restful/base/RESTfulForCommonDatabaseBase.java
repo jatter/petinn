@@ -27,6 +27,8 @@ import java.io.*;
 import java.sql.*;
 import java.util.*;
 import java.util.Date;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * RESTfulForCommonDatabaseBase
@@ -47,17 +49,88 @@ public class RESTfulForCommonDatabaseBase extends RESTfulForBase {
     public static final String O_TYPE_QUERY = "Q";  //查询
 
     /**
-     * 创建
-     * @param jsonStr
-     * @param jsonOut
+     * 查询
+     * @param jsonParams
      * @param response
      * @return
      */
     @POST
-    @Path("save")
+    @Path("query")
     @Produces(MediaType.APPLICATION_JSON)
-    public String save(@FormParam(value = "jsonStr") String jsonStr,
-            @FormParam(value = "jsonOut") String jsonOut,
+    public String query(@FormParam(value = "jsonParams") String jsonParams,
+                        @Context HttpServletResponse response){
+        //设置响应头编码格式
+        response.setCharacterEncoding("utf-8");
+        response.setContentType("application/json; charset=UTF-8");
+        Map<String, Object> queryResultMap = FastMap.newInstance();
+        PrintWriter out = null;
+        BasePosObject pObject = new BasePosObject();
+        Delegator delegator = getDelegator();
+        boolean isSuccess = true;
+        try {
+            out = response.getWriter();
+            Map<String, Object> jsonObj = UtilValidate.isNotEmpty(jsonParams) ? JSONUtil.json2Map(jsonParams): new HashMap<String, Object>();
+            String rid =  UtilValidate.isNotEmpty(jsonObj.get("rid")) ? jsonObj.get("rid").toString() : "";
+            String olist =  UtilValidate.isNotEmpty(jsonObj.get("olist")) ? jsonObj.get("olist").toString() : "";
+            List<Map<String, Object>> operateList = (List<Map<String, Object>>)jsonObj.get("olist");
+            // List<Map<String, Object>> operateList = (List<Map<String, Object>>)JSONUtil.json2Bean(olist, List.class);
+            for(Map<String, Object> operateMap : operateList){
+                if(UtilValidate.isEmpty(operateMap.get("tname")) || UtilValidate.isEmpty(operateMap.get("ttype")) ||
+                        UtilValidate.isEmpty(operateMap.get("otype"))){
+                    isSuccess = false;
+                    break;
+                }
+
+                Map<String, Object> resultMap = executeQuery(operateMap);
+                List<Integer> totalNumList = FastList.newInstance();
+                List<List<Map<String, Object>>> dataList = FastList.newInstance();
+                //如果查询结果中存在，则增加
+                if(UtilValidate.isNotEmpty(queryResultMap.get("dataList")) && UtilValidate.isNotEmpty(queryResultMap.get("totalNum")))
+                {
+                    totalNumList.add(Integer.valueOf(""+resultMap.get("totalNum")));
+                    dataList.add((List<Map<String, Object>>)resultMap.get("dataList"));
+                    queryResultMap.remove("totalNum");
+                    queryResultMap.remove("dataList");
+                    queryResultMap.put("totalNum", totalNumList);
+                    queryResultMap.put("dataList", dataList);
+                    //如果查询结果中不存在，则插入
+                }else{
+                    queryResultMap.put("totalNum", resultMap.get("totalNum"));
+                    queryResultMap.put("dataList", resultMap.get("dataList"));
+                }
+            }
+            if(isSuccess) {
+                pObject.setFlag("S");
+                pObject.setMsg("查询成功");
+                pObject.setData(queryResultMap);
+            }else{
+                pObject.setFlag("F");
+                pObject.setMsg("参数不正确");
+            }
+        }catch (Exception e) {
+            if (Debug.errorOn()) {
+                Debug.logError(e, module);
+            }
+            pObject.setFlag("F");
+            pObject.setMsg("服务错误:"+e.toString());
+            pObject.setData("");
+        }
+        out.println(JSONSerializer.toJSON(JSONUtil.bean2Json(pObject)).toString());
+        out.flush();
+        out.close();
+        return null;
+    }
+
+    /**
+     * 更新
+     * @param jsonParams
+     * @param response
+     * @return
+     */
+    @POST
+    @Path("update")
+    @Produces(MediaType.APPLICATION_JSON)
+    public String update(@FormParam(value = "jsonParams") String jsonParams,
             @Context HttpServletResponse response){
         //设置响应头编码格式
         response.setCharacterEncoding("utf-8");
@@ -70,7 +143,7 @@ public class RESTfulForCommonDatabaseBase extends RESTfulForBase {
         try {
                 TransactionUtil.begin(30);
                 out = response.getWriter();
-                Map<String, Object> jsonObj = UtilValidate.isNotEmpty(jsonStr) ? JSONUtil.json2Map(jsonStr): new HashMap<String, Object>();
+                Map<String, Object> jsonObj = UtilValidate.isNotEmpty(jsonParams) ? JSONUtil.json2Map(jsonParams): new HashMap<String, Object>();
                 String tid =  UtilValidate.isNotEmpty(jsonObj.get("rid")) ? jsonObj.get("rid").toString() : "";
                 String olist =  UtilValidate.isNotEmpty(jsonObj.get("olist")) ? jsonObj.get("olist").toString() : "";
                 List<Map<String, Object>> operateList = (List<Map<String, Object>>)JSONUtil.json2Bean(olist, List.class);
@@ -82,11 +155,13 @@ public class RESTfulForCommonDatabaseBase extends RESTfulForBase {
                     }
                     //如果操作类型为创建
                     if(O_TYPE_SAVE.equals(operateMap.get("otype"))){
-                        save(operateMap);
+                        executeSave(operateMap);
+                    //如果操作类型为删除
                     }else if(O_TYPE_DELETE.equals(operateMap.get("otype"))){
-                        delete(operateMap);
+                        executeDelete(operateMap);
+                    //如果操作类型为更新
                     }else if(O_TYPE_UPDATE.equals(operateMap.get("otype"))){
-                        update(operateMap);
+                        executeUpdate(operateMap);
                     }
                 }
                 if(isSuccess) {
@@ -120,137 +195,10 @@ public class RESTfulForCommonDatabaseBase extends RESTfulForBase {
 
     /**
      * 查询
-     * @param jsonStr
-     * @param jsonOut
-     * @param response
-     * @return
-     */
-    @POST
-    @Path("query")
-    @Produces(MediaType.APPLICATION_JSON)
-    public String query(@FormParam(value = "jsonStr") String jsonStr,
-            @FormParam(value = "jsonOut") String jsonOut,
-            @Context HttpServletResponse response){
-        //设置响应头编码格式
-        response.setCharacterEncoding("utf-8");
-        response.setContentType("application/json; charset=UTF-8");
-        Map<String, Object> queryResultMap = FastMap.newInstance();
-        PrintWriter out = null;
-        BasePosObject pObject = new BasePosObject();
-        Delegator delegator = getDelegator();
-        boolean isSuccess = true;
-        try {
-            out = response.getWriter();
-            Map<String, Object> jsonObj = UtilValidate.isNotEmpty(jsonStr) ? JSONUtil.json2Map(jsonStr): new HashMap<String, Object>();
-            String rid =  UtilValidate.isNotEmpty(jsonObj.get("rid")) ? jsonObj.get("rid").toString() : "";
-            String olist =  UtilValidate.isNotEmpty(jsonObj.get("olist")) ? jsonObj.get("olist").toString() : "";
-            List<Map<String, Object>> operateList = (List<Map<String, Object>>)jsonObj.get("olist");
-           // List<Map<String, Object>> operateList = (List<Map<String, Object>>)JSONUtil.json2Bean(olist, List.class);
-            for(Map<String, Object> operateMap : operateList){
-                if(UtilValidate.isEmpty(operateMap.get("tname")) || UtilValidate.isEmpty(operateMap.get("ttype")) ||
-                        UtilValidate.isEmpty(operateMap.get("otype"))){
-                    isSuccess = false;
-                    break;
-                }
-
-                Map<String, Object> resultMap = find(operateMap);
-                List<Integer> totalNumList = FastList.newInstance();
-                List<List<Map<String, Object>>> dataList = FastList.newInstance();
-                //如果查询结果中存在，则增加
-                if(UtilValidate.isNotEmpty(queryResultMap.get("dataList")) && UtilValidate.isNotEmpty(queryResultMap.get("totalNum")))
-                {
-                    totalNumList.add(Integer.valueOf(""+resultMap.get("totalNum")));
-                    dataList.add((List<Map<String, Object>>)resultMap.get("dataList"));
-                    queryResultMap.remove("totalNum");
-                    queryResultMap.remove("dataList");
-                    queryResultMap.put("totalNum", totalNumList);
-                    queryResultMap.put("dataList", dataList);
-                //如果查询结果中不存在，则插入
-                }else{
-                    queryResultMap.put("totalNum", resultMap.get("totalNum"));
-                    queryResultMap.put("dataList", resultMap.get("dataList"));
-                }
-            }
-            if(isSuccess) {
-                pObject.setFlag("S");
-                pObject.setMsg("查询成功");
-                pObject.setData(queryResultMap);
-            }else{
-                pObject.setFlag("F");
-                pObject.setMsg("参数不正确");
-            }
-        }catch (Exception e) {
-            if (Debug.errorOn()) {
-                Debug.logError(e, module);
-            }
-            pObject.setFlag("F");
-            pObject.setMsg("服务错误:"+e.toString());
-            pObject.setData("");
-        }
-        out.println(JSONSerializer.toJSON(JSONUtil.bean2Json(pObject)).toString());
-        out.flush();
-        out.close();
-        return null;
-    }
-
-
-
-    /**
-     * 保存
      * @param operateMap
      * @return
      */
-    public void save(Map<String, Object> operateMap) throws GenericEntityException{
-        Delegator delegator = EcommerceGlobalCache.getInstance().getDelegator();
-        Map<String, Object> resultMap = FastMap.newInstance();
-        //如果为操作表
-        if(T_TYPE_TABLLE.equals(operateMap.get("ttype"))){
-            //如果表编号需要数据库端生成
-            if(String.valueOf(operateMap.get("tdata")).contains("#UUID#")){
-                operateMap.put("tdata", String.valueOf(operateMap.get("tdata")).replace("#UUID#", delegator.getNextSeqId(String.valueOf(operateMap.get("tname")))));
-            }
-            GenericValue genericValue = delegator.makeValidValue(String.valueOf(operateMap.get("tname")), JSONUtil.json2Map(String.valueOf(operateMap.get("tdata"))));
-            delegator.create(genericValue);
-        }
-    }
-
-    /**
-     * 删除
-     * @param operateMap
-     * @return
-     */
-    public int delete(Map<String, Object> operateMap) throws Exception{
-        Delegator delegator = EcommerceGlobalCache.getInstance().getDelegator();
-        Map<String, Object> resultMap = FastMap.newInstance();
-        int count = 0;
-        //如果为操作实体
-        if(T_TYPE_ENTITY.equals(operateMap.get("ttype"))){
-            List<GenericValue> genericValueList = delegator.findByAnd(String.valueOf(operateMap.get("tname")), JSONUtil.json2Map(String.valueOf(operateMap.get("tdata"))));
-            count = delegator.removeAll(genericValueList);
-        }
-        return  count;
-    }
-
-    /**
-     * 更新
-     * @param operateMap
-     * @return
-     */
-    public void update(Map<String, Object> operateMap) throws GenericEntityException{
-        Delegator delegator = EcommerceGlobalCache.getInstance().getDelegator();
-        //如果为操作表
-        if(T_TYPE_TABLLE.equals(operateMap.get("ttype"))){
-            GenericValue genericValue = delegator.makeValidValue(String.valueOf(operateMap.get("tname")), JSONUtil.json2Map(String.valueOf(operateMap.get("tdata"))));
-            delegator.createOrStore(genericValue);
-        }
-    }
-
-    /**
-     * 查询
-     * @param operateMap
-     * @return
-     */
-    public Map<String, Object> find(Map<String, Object> operateMap){
+    public Map<String, Object> executeQuery(Map<String, Object> operateMap){
         Map<String, Object> resultMap = FastMap.newInstance();
         List dataList = FastList.newInstance();
         //如果为查询实体
@@ -264,6 +212,145 @@ public class RESTfulForCommonDatabaseBase extends RESTfulForBase {
             resultMap = executeSqlQuery(getQuerySql(operateMap), paramMap);
         }
         return  resultMap;
+    }
+
+    /**
+     * 保存
+     * @param operateMap
+     * @return
+     */
+    public void executeSave(Map<String, Object> operateMap) throws GenericEntityException{
+        Map<String, Object> resultMap = FastMap.newInstance();
+        //如果为操作实体
+        if(T_TYPE_ENTITY.equals(operateMap.get("ttype"))){
+            entitySave(operateMap);
+        }else{
+            tableSave(operateMap);
+        }
+    }
+
+    /**
+     * 删除
+     * @param operateMap
+     * @return
+     */
+    public void executeDelete(Map<String, Object> operateMap) throws Exception{
+        Map<String, Object> resultMap = FastMap.newInstance();
+        //如果为操作实体
+        if(T_TYPE_ENTITY.equals(operateMap.get("ttype"))){
+            entityDelete(operateMap);
+        }else{
+            tableDelete(operateMap);
+        }
+    }
+
+    /**
+     * 更新
+     * @param operateMap
+     * @return
+     */
+    public void executeUpdate(Map<String, Object> operateMap) throws Exception{
+        Map<String, Object> resultMap = FastMap.newInstance();
+        //如果为操作实体
+        if(T_TYPE_ENTITY.equals(operateMap.get("ttype"))){
+            entityUpdate(operateMap);
+        }else{
+            tableUpdate(operateMap);
+        }
+    }
+
+    /**
+     * 实体保存
+     * @param operateMap
+     * @return
+     */
+    public void entitySave(Map<String, Object> operateMap) throws GenericEntityException{
+        Delegator delegator = EcommerceGlobalCache.getInstance().getDelegator();
+        Map<String, Object> resultMap = FastMap.newInstance();
+        //如果表编号需要数据库端生成
+        if(String.valueOf(operateMap.get("tdata")).contains("#UUID#")){
+            operateMap.put("tdata", String.valueOf(operateMap.get("tdata")).replace("#UUID#", delegator.getNextSeqId(String.valueOf(operateMap.get("tname")))));
+        }
+        GenericValue genericValue = delegator.makeValidValue(String.valueOf(operateMap.get("tname")), JSONUtil.json2Map(String.valueOf(operateMap.get("tdata"))));
+        delegator.create(genericValue);
+    }
+
+    /**
+     * 表保存
+     * @param operateMap
+     * @return
+     */
+    public void tableSave(Map<String, Object> operateMap) throws GenericEntityException{
+        Delegator delegator = EcommerceGlobalCache.getInstance().getDelegator();
+        Map<String, Object> resultMap = FastMap.newInstance();
+        //如果表编号需要数据库端生成
+        if(String.valueOf(operateMap.get("tdata")).contains("#UUID#")){
+            operateMap.put("tdata", String.valueOf(operateMap.get("tdata")).replace("#UUID#", delegator.getNextSeqId(String.valueOf(operateMap.get("tname")))));
+        }
+        GenericValue genericValue = delegator.makeValidValue(String.valueOf(operateMap.get("tname")), JSONUtil.json2Map(String.valueOf(operateMap.get("tdata"))));
+        delegator.create(genericValue);
+    }
+
+    /**
+     * 实体删除
+     * @param operateMap
+     * @return
+     */
+    public int entityDelete(Map<String, Object> operateMap) throws Exception{
+        Delegator delegator = EcommerceGlobalCache.getInstance().getDelegator();
+        Map<String, Object> resultMap = FastMap.newInstance();
+        int count = 0;
+        //如果为操作实体
+        if(T_TYPE_ENTITY.equals(operateMap.get("ttype"))){
+            List<GenericValue> genericValueList = delegator.findByAnd(String.valueOf(operateMap.get("tname")), JSONUtil.json2Map(String.valueOf(operateMap.get("tdata"))));
+            count = delegator.removeAll(genericValueList);
+        }
+        return  count;
+    }
+
+    /**
+     * 表删除
+     * @param operateMap
+     * @return
+     */
+    public int tableDelete(Map<String, Object> operateMap) throws Exception{
+        Delegator delegator = EcommerceGlobalCache.getInstance().getDelegator();
+        Map<String, Object> resultMap = FastMap.newInstance();
+        int count = 0;
+        //如果为操作实体
+        if(T_TYPE_ENTITY.equals(operateMap.get("ttype"))){
+            List<GenericValue> genericValueList = delegator.findByAnd(String.valueOf(operateMap.get("tname")), JSONUtil.json2Map(String.valueOf(operateMap.get("tdata"))));
+            count = delegator.removeAll(genericValueList);
+        }
+        return  count;
+    }
+
+    /**
+     * 实体更新
+     * @param operateMap
+     * @return
+     */
+    public void entityUpdate(Map<String, Object> operateMap) throws GenericEntityException{
+        Delegator delegator = EcommerceGlobalCache.getInstance().getDelegator();
+        //如果为操作表
+        if(T_TYPE_TABLLE.equals(operateMap.get("ttype"))){
+            GenericValue genericValue = delegator.makeValidValue(String.valueOf(operateMap.get("tname")), JSONUtil.json2Map(String.valueOf(operateMap.get("tdata"))));
+            delegator.createOrStore(genericValue);
+        }
+    }
+
+    /**
+     * 表更新
+     * @param operateMap
+     * @return
+     */
+    public void tableUpdate(Map<String, Object> operateMap) throws GenericEntityException{
+        Delegator delegator = EcommerceGlobalCache.getInstance().getDelegator();
+        //如果为操作表
+        if(T_TYPE_TABLLE.equals(operateMap.get("ttype"))){
+            GenericValue genericValue = delegator.makeValidValue(String.valueOf(operateMap.get("tname")), JSONUtil.json2Map(String.valueOf(operateMap.get("tdata"))));
+            delegator.createOrStore(genericValue);
+        }
     }
 
     /**
@@ -433,7 +520,7 @@ public class RESTfulForCommonDatabaseBase extends RESTfulForBase {
                     //    rowData.put(md.getColumnName(i), UtilValidate.isNotEmpty(rsRecord.getObject(i)) ?
                     //            ConvertUtil.convertTimestampToString(((mysql.sql.TIMESTAMP) rsRecord.getObject(i)).timestampValue()) : "");
                     //}else{
-                        rowData.put(md.getColumnName(i), UtilValidate.isNotEmpty(rsRecord.getObject(i)) ? rsRecord.getObject(i) : "");
+                        rowData.put(tableFieldToModelField(md.getColumnName(i)), UtilValidate.isNotEmpty(rsRecord.getObject(i)) ? rsRecord.getObject(i) : "");
                     //}
                 }
                 dataList.add(rowData);
@@ -445,4 +532,82 @@ public class RESTfulForCommonDatabaseBase extends RESTfulForBase {
         resultMap.put("dataList", dataList);
         return resultMap;
     }
+
+    /**
+     * 实体字段转表字段
+     * @param field
+     * @return
+     */
+    public static String modelFieldToTableField(String field){
+        Pattern pattern = Pattern.compile("[^_][A-Z]");
+        Matcher matcher = pattern.matcher(field);
+        while(matcher.find()){
+            field = field.replaceFirst(matcher.group().substring(1), "_"+matcher.group().substring(1));
+        }
+
+        return field.toUpperCase();
+    }
+
+    /**
+     * 表字段转实体字段
+     * @param field
+     * @return
+     */
+    public static String tableFieldToModelField(String field){
+        Pattern pattern = Pattern.compile("[_][a-z]");
+        Matcher matcher = pattern.matcher(field.toLowerCase());
+        while(matcher.find()){
+            field = field.replaceFirst(matcher.group(), matcher.group().substring(1).toUpperCase());
+        }
+
+        return field;
+    }
+
+    /**
+     * 字符串大写字母前加下划线
+     * @param param
+     * @return
+     */
+    public static String upperCharAddUnderLine(String param){
+        Pattern pattern = Pattern.compile("[^_][A-Z]");
+        Matcher matcher = pattern.matcher(param);
+        while(matcher.find()){
+            param = param.replaceFirst(matcher.group().substring(1),"_"+matcher.group().substring(1));
+        }
+        return param;
+    }
+
+    /**
+     * 字符串大写字母前减去划线
+     * @param param
+     * @return
+     */
+    public static String upperCharSubtractUnderLine(String param){
+        Pattern pattern = Pattern.compile("[_][A-Z]");
+        Matcher matcher = pattern.matcher(param);
+        while(matcher.find()){
+            param = param.replaceFirst(matcher.group(), matcher.group().substring(1));
+        }
+        return param;
+    }
+
+    /**
+     * 字符串小写字母前减去划线
+     * @param param
+     * @return
+     */
+    public static String lowerCharSubtractUnderLine(String param){
+        Pattern pattern = Pattern.compile("[_][a-z]");
+        Matcher matcher = pattern.matcher(param);
+        while(matcher.find()){
+            param = param.replaceFirst(matcher.group(), matcher.group().substring(1));
+        }
+        return param;
+    }
+
+    public static void main(String[] args){
+
+        System.out.println("======");
+    }
+
 }

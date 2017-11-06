@@ -50,7 +50,7 @@ access. For a detailed description see the core/docs/entityconfig.html file.
     <connection-factory class="org.ofbiz.entity.connection.DBCPConnectionFactory"/>
 
     <debug-xa-resources value="false" />  <!-- see https://issues.apache.org/jira/browse/OFBIZ-4282 for more -->
-    
+
     <delegator name="default" entity-model-reader="main" entity-group-reader="main" entity-eca-reader="main" distributed-cache-clear-enabled="false">
         <group-map group-name="org.ofbiz" datasource-name="localmysql"/>
         <group-map group-name="org.ofbiz.olap" datasource-name="localmysql"/>
@@ -86,7 +86,7 @@ access. For a detailed description see the core/docs/entityconfig.html file.
         <group-map group-name="org.ofbiz.olap" datasource-name="localpostolap"/>
         <group-map group-name="org.ofbiz.tenant" datasource-name="localposttenant"/>  -->
     </delegator>
-   
+
     <!-- need to at least define a name for each component to use -->
     <entity-model-reader name="main"/>
 
@@ -127,7 +127,7 @@ access. For a detailed description see the core/docs/entityconfig.html file.
     <field-type name="firebird" loader="fieldfile" location="fieldtypefirebird.xml"/>
     <field-type name="mssql" loader="fieldfile" location="fieldtypemssql.xml"/>
     <field-type name="advantage" loader="fieldfile" location="fieldtypeadvantage.xml"/>
-    
+
     <!--
     For DAO/JDBC Helper: Tries:
       1. JNDI Datasource IF jdbc.jndi.name, context.provider, etc are specified
@@ -323,18 +323,18 @@ access. For a detailed description see the core/docs/entityconfig.html file.
     </datasource>
 
     <datasource name="localmysql"
-            helper-class="org.ofbiz.entity.datasource.GenericHelperDAO"
-            field-type-name="mysql"
-            check-on-start="false"
-            add-missing-on-start="false"
-            check-pks-on-start="false"
-            use-foreign-keys="false"
-            join-style="ansi-no-parenthesis"
-            alias-view-columns="false"
-            drop-fk-use-foreign-key-keyword="true"
-            table-type="InnoDB"
-            character-set="latin1"
-            collate="latin1_general_cs">
+                helper-class="org.ofbiz.entity.datasource.GenericHelperDAO"
+                field-type-name="mysql"
+                check-on-start="true"
+                add-missing-on-start="true"
+                check-pks-on-start="false"
+                use-foreign-keys="true"
+                join-style="ansi-no-parenthesis"
+                alias-view-columns="false"
+                drop-fk-use-foreign-key-keyword="true"
+                table-type="InnoDB"
+                character-set="utf8"
+                collate="utf8_general_ci">
         <read-data reader-name="tenant"/>
         <read-data reader-name="seed"/>
         <read-data reader-name="seed-initial"/>
@@ -342,7 +342,7 @@ access. For a detailed description see the core/docs/entityconfig.html file.
         <read-data reader-name="ext"/>
         <inline-jdbc
                 jdbc-driver="com.mysql.jdbc.Driver"
-                jdbc-uri="jdbc:mysql://127.0.0.1/ofbiz?autoReconnect=true"
+                jdbc-uri="jdbc:mysql://127.0.0.1/petinn?autoReconnect=true&amp;characterEncoding=UTF-8"
                 jdbc-username="root"
                 jdbc-password="root"
                 isolation-level="ReadCommitted"
